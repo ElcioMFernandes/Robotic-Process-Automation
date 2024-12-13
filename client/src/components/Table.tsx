@@ -1,48 +1,40 @@
-import { TableProps } from "@/interface/tableProps";
+interface TableProps {
+  headers: {
+    key: string;
+    link?: string;
+    title: string;
+  }[];
+  data: Record<string, any>[];
+}
 
-export const Table = (props: TableProps) => {
+export const Table = async (props: TableProps) => {
   return (
-    <table className="table-auto border-collapse border-t border-gray-300 w-full text-center">
+    <table>
       <thead>
-        <tr className="">
+        <tr>
           {props.headers.map((header) => (
-            <th
-              key={header.key}
-              className="border-gray-300 px-4 py-2 text-blue-500"
-            >
-              {header.name}
-            </th>
+            <th key={header.key}>{header.title}</th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {props.data.map((row, rowIndex) => (
-          <tr key={rowIndex} className="hover:bg-gray-300">
-            {props.headers.map((header) => {
-              const cellValue = row[header.key];
-
-              return (
-                <td
-                  key={`${rowIndex}-${header.key}`}
-                  className="px-4 py-2 border-t"
-                >
-                  {typeof cellValue === "boolean" ? (
-                    <input
-                      type="checkbox"
-                      checked={cellValue}
-                      readOnly
-                      className="accent-blue-500 hover:accent-blue-500"
-                    />
-                  ) : header.link ? (
-                    <a href={`${header.link}${cellValue}`} className="">
-                      {cellValue}
-                    </a>
-                  ) : (
-                    cellValue || "-"
-                  )}
-                </td>
-              );
-            })}
+        {props.data.map((data, i) => (
+          <tr key={i}>
+            {props.headers.map((header) => (
+              <td key={header.key}>
+                {header.link ? (
+                  <a href={`${header.link}${data[header.key]}`}>
+                    {data[header.key]}
+                  </a>
+                ) : typeof data[header.key] === "object" ? (
+                  JSON.stringify(data[header.key])
+                ) : typeof data[header.key] === "boolean" ? (
+                  <input type="checkbox" checked={data[header.key]} readOnly />
+                ) : (
+                  data[header.key]
+                )}
+              </td>
+            ))}
           </tr>
         ))}
       </tbody>

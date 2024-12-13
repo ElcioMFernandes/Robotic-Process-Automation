@@ -1,10 +1,22 @@
-import Frame from "@/components/Frame";
+import { Table } from "@/components/Table";
+import { fetchJob } from "@/services/fetchJob";
 
-const Home = () => {
+const Home = async () => {
+  const response = await fetchJob("http://127.0.0.1:8000/jobs");
+  const headers = [
+    { key: "id", title: "Identificador", link: "/job/" },
+    { key: "title", title: "Título" },
+    { key: "description", title: "Descrição" },
+    { key: "periodicity", title: "Periodicidade" },
+    { key: "args", title: "Argumentos" },
+    { key: "kwargs", title: "Argumentos nomeados" },
+    { key: "status", title: "Status" },
+  ];
+
   return (
-    <Frame>
-      <p className="h-[1250px]">Conteúdo</p>
-    </Frame>
+    <div>
+      <Table headers={headers} data={response} />
+    </div>
   );
 };
 
