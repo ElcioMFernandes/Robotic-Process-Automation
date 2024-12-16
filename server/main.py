@@ -1,3 +1,9 @@
+import apscheduler
+import uuid
+import apscheduler.schedulers
+import apscheduler.schedulers.background
+from pydantic import BaseModel
+from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, responses
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,6 +17,20 @@ app.add_middleware(
     allow_methods=["*"],  # Permite todos os métodos HTTP
     allow_headers=["*"],  # Permite todos os cabeçalhos
 )
+
+class JobBase(BaseModel):
+    title: str
+    description: str
+    periodicity: str
+    args: List[Any]
+    kwargs: Dict[str, Any]
+    status: bool
+
+class JobCreate(JobBase):
+    pass
+
+class Job(JobBase):
+    id: str
 
 # Dados simulados
 jobs = [
@@ -157,14 +177,24 @@ jobs = [
 ]
 
 
-@app.get("/jobs")
+@app.get("/api/v2/jobs")
 async def read_jobs():
     return responses.JSONResponse(content=jobs)
 
-@app.get("/job/{id}")
+@app.get("/api/v2/job/{id}")
 async def read_job(id: str):
-    # Procura o job pelo ID
     job = next((job for job in jobs if job["id"] == id), None)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return responses.JSONResponse(content=job)
+
+@app.post("/api/v2/job")
+async def create_job(job: JobCreate):
+    new_job = job.model_dump()
+    new_job["id"] = str(uuid.uuid4())
+    jobs.append(new_job)
+    return responses.JSONResponse(content=new_job)
+
+## Início versão MVP
+
+scheduler = apscheduler.schedulers.background.BackgroundScheduler()
