@@ -341,4 +341,7 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+# Tasks dir
+tasks/
+
 # End of https://www.toptal.com/developers/gitignore/api/python,node,nextjs

@@ -1,200 +1,150 @@
-import apscheduler
-import uuid
-import apscheduler.schedulers
-import apscheduler.schedulers.background
-from pydantic import BaseModel
-from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException, responses
-from fastapi.middleware.cors import CORSMiddleware
+import fastapi, os, shutil, time, logging # type: ignore
+from fastapi.middleware.cors import CORSMiddleware # type: ignore
 
-app = FastAPI()
+API = fastapi.FastAPI()
 
-# Configurações de CORS para http://localhost:3000
-app.add_middleware(
+logging.basicConfig(filename="logs.log",
+                    level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s",)
+
+API.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000/"],  # Apenas esta origem é permitida
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite todos os métodos HTTP
-    allow_headers=["*"],  # Permite todos os cabeçalhos
+    allow_origins=["http://localhost:3000"],  # Origem permitida
+    allow_credentials=True,  # Permitir envio de cookies (se necessário)
+    allow_methods=["*"],  # Permitir todos os métodos HTTP (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Permitir todos os cabeçalhos
 )
 
-class JobBase(BaseModel):
-    title: str
-    description: str
-    periodicity: str
-    args: List[Any]
-    kwargs: Dict[str, Any]
-    status: bool
+# Middleware para log global
+@API.middleware("http")
+async def log_requests(request: fastapi.Request, call_next):
+    # Captura o tempo inicial
+    start_time = time.time()
+    
+    # Dados da requisição
+    client_ip = request.client.host
+    method = request.method
+    url = str(request.url)
+    headers = dict(request.headers)
+    query_params = dict(request.query_params)
+    body = await request.body()  # Captura o body da requisição
 
-class JobCreate(JobBase):
-    pass
+    # Processa a requisição
+    response = await call_next(request)
+    
+    # Tempo de resposta
+    process_time = time.time() - start_time
+    status_code = response.status_code
 
-class Job(JobBase):
-    id: str
+    # Dados do log
+    log_data = {
+        "client_ip": client_ip,
+        "method": method,
+        "url": url,
+        "status_code": status_code,
+        "process_time": f"{process_time:.4f}s",
+        "headers": headers,
+        "query_params": query_params,
+        "body": body.decode("utf-8") if body else "No body"
+    }
 
-# Dados simulados
-jobs = [
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a1",
-        "title": "Tarefa 1",
-        "description": "Descrição da tarefa de número 1",
-        "periodicity": "1 * * * *",
-        "args": [1, 10, 100],
-        "kwargs": {
-            "string": "1",
-            "integer": 1,
-            "float": 1.1,
-            "bool": True,
-        },
-        "status": False,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a2",
-        "title": "Tarefa 2",
-        "description": "Descrição da tarefa de número 2",
-        "periodicity": "2 * * * *",
-        "args": [2, 20, 200],
-        "kwargs": {
-            "string": "2",
-            "integer": 2,
-            "float": 2.2,
-            "bool": True,
-        },
-        "status": False,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a3",
-        "title": "Tarefa 3",
-        "description": "Descrição da tarefa de número 3",
-        "periodicity": "3 * * * *",
-        "args": [3, 30, 300],
-        "kwargs": {
-            "string": "3",
-            "integer": 3,
-            "float": 3.3,
-            "bool": True,
-        },
-        "status": True,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a4",
-        "title": "Tarefa 4",
-        "description": "Descrição da tarefa de número 4",
-        "periodicity": "4 * * * *",
-        "args": [4, 40, 400],
-        "kwargs": {
-            "string": "4",
-            "integer": 4,
-            "float": 4.4,
-            "bool": False,
-        },
-        "status": False,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a5",
-        "title": "Tarefa 5",
-        "description": "Descrição da tarefa de número 5",
-        "periodicity": "5 * * * *",
-        "args": [5, 50, 500],
-        "kwargs": {
-            "string": "5",
-            "integer": 5,
-            "float": 5.5,
-            "bool": True,
-        },
-        "status": True,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a6",
-        "title": "Tarefa 6",
-        "description": "Descrição da tarefa de número 6",
-        "periodicity": "6 * * * *",
-        "args": [6, 60, 600],
-        "kwargs": {
-            "string": "6",
-            "integer": 6,
-            "float": 6.6,
-            "bool": False,
-        },
-        "status": False,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a7",
-        "title": "Tarefa 7",
-        "description": "Descrição da tarefa de número 7",
-        "periodicity": "7 * * * *",
-        "args": [7, 70, 700],
-        "kwargs": {
-            "string": "7",
-            "integer": 7,
-            "float": 7.7,
-            "bool": True,
-        },
-        "status": True,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a8",
-        "title": "Tarefa 8",
-        "description": "Descrição da tarefa de número 8",
-        "periodicity": "8 * * * *",
-        "args": [8, 80, 800],
-        "kwargs": {
-            "string": "8",
-            "integer": 8,
-            "float": 8.8,
-            "bool": False,
-        },
-        "status": False,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1a9",
-        "title": "Tarefa 9",
-        "description": "Descrição da tarefa de número 9",
-        "periodicity": "9 * * * *",
-        "args": [9, 90, 900],
-        "kwargs": {
-            "string": "9",
-            "integer": 9,
-            "float": 9.9,
-            "bool": True,
-        },
-        "status": True,
-    },
-    {
-        "id": "64b2a1d4c6f8e1e76293f1aa",
-        "title": "Tarefa 10",
-        "description": "Descrição da tarefa de número 10",
-        "periodicity": "10 * * * *",
-        "args": [10, 100, 1000],
-        "kwargs": {
-            "string": "10",
-            "integer": 10,
-            "float": 10.1,
-            "bool": True,
-        },
-        "status": True,
-    },
-]
+    # Escreve o log
+    logging.info(log_data)
 
+    return response
 
-@app.get("/api/v2/jobs")
-async def read_jobs():
-    return responses.JSONResponse(content=jobs)
+UPLOAD_DIR = "tasks"  # Pasta onde os arquivos serão salvos
+os.makedirs(UPLOAD_DIR, exist_ok=True)  # Cria o diretório se não existir
 
-@app.get("/api/v2/job/{id}")
-async def read_job(id: str):
-    job = next((job for job in jobs if job["id"] == id), None)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return responses.JSONResponse(content=job)
+tasks = []
 
-@app.post("/api/v2/job")
-async def create_job(job: JobCreate):
-    new_job = job.model_dump()
-    new_job["id"] = str(uuid.uuid4())
-    jobs.append(new_job)
-    return responses.JSONResponse(content=new_job)
+@API.get("/api/v1")
+async def health():
+    response = {
+        "header": {
+            "status": "success",
+            "message": "API Health.",
+        },
+        "data": "Hello World"
+    }
+    return fastapi.responses.JSONResponse(content = response, status_code = 200)
 
-## Início versão MVP
+@API.get("/api/v1/task")
+async def get_tasks():
+    response = {
+        "header": {
+            "status": "success",
+            "message": "List of available tasks.",
+        },
+        "data": tasks
+    }
 
-scheduler = apscheduler.schedulers.background.BackgroundScheduler()
+    return fastapi.responses.JSONResponse(content = response, status_code = 200)
+
+@API.post("/api/v1/task")
+async def create_task(
+    name: str = fastapi.Form(...),
+    description: str = fastapi.Form(...),
+    file: fastapi.UploadFile = fastapi.File(...)
+):
+
+    if not file.filename.endswith(".py"):
+        response = {
+        "header": {
+            "status": "failed",
+            "message": "The uploaded file must have the extension .py",
+            },
+            "data": None
+            }
+        return fastapi.responses.JSONResponse(content = response, status_code = 300)
+
+    if file.filename in os.listdir(UPLOAD_DIR):
+        response = {
+        "header": {
+            "status": "failed",
+            "message": "There is already a task registered with this file name",
+            },
+        "data": None
+            }
+        return fastapi.responses.JSONResponse(content = response, status_code = 300)
+
+    id = 1
+
+    if len(tasks) > 0:
+        id = tasks[-1]["id"] + 1
+
+    tasks.append(
+        {
+            "id": id,
+            "name": name,
+            "description": description,
+            "filename": file.filename
+        }
+    )
+    response = {
+        "header": {
+            "status": "success",
+            "message": "Tasks created.",
+            },
+        "data": tasks[-1]
+            }
+
+    file_location = f"{UPLOAD_DIR}/{file.filename}"
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return fastapi.responses.JSONResponse(content = response, status_code = 200)
+
+@API.get("/api/v1/task/{id}")
+async def get_task(id: int):
+    for task in tasks:
+        if task["id"] == id:
+            response = {
+                "header": {
+                    "status": "success",
+                    "message": "Tasks details."
+                },
+                "data": task
+            }
+
+            return fastapi.responses.JSONResponse(content = response, status_code = 200)
